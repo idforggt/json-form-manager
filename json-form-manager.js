@@ -1,18 +1,20 @@
+const REGEX_FULL_KEY = /^(\[[^\[\]]+\])+$/;
+const REGEX_NESTED_KEYS = /([^\[\]]+)/g;
 const isIdx = target => Number.isInteger(Number(target));
 
 const getValue = element => {
 	const value = element.value;
-	switch ((element.getAttribute('type') || '').toLowerCase()) {
-		case 'number':
+	switch ((element.getAttribute("type") || "").toLowerCase()) {
+		case "number":
 			const number = Number(value);
 			if (isNaN(number)) {
 				throw new TypeError(`Invalid number. value=${value}`);
 			}
 			return number;
-		case 'checkbox':
-		case 'radio':
+		case "checkbox":
+		case "radio":
 			if (value) {
-				return element.checked ? value : '';
+				return element.checked ? value : "";
 			} else {
 				return element.checked;
 			}
@@ -22,7 +24,7 @@ const getValue = element => {
 
 const serialize = form => {
 	if (!form instanceof HTMLFormElement) {
-		throw new TypeError('Invalid parameter. form is not HTMLFormElement');
+		throw new TypeError("Invalid parameter. form is not HTMLFormElement");
 	}
 
 	let root = {};
@@ -31,16 +33,19 @@ const serialize = form => {
 		const element = form.elements.item(elIdx);
 
 		// const tagName = element.tagName;
-		const key = element.getAttribute('name');
-		if (!key || (element.getAttribute('type') === 'radio' && !element.checked)) {
+		const key = element.getAttribute("name");
+		if (
+			!key ||
+			(element.getAttribute("type") === "radio" && !element.checked)
+		) {
 			continue;
 		}
 
-		if (/^[^\[\]]+(\[[^\[\]]+\])*$/.test(key) === false) {
+		if (REGEX_FULL_KEY.test(key) === false) {
 			throw new TypeError(`Invalid json key. name="${key}"`);
 		}
 
-		const nestedKeys = key.match(/([^\[\]]+)/g);
+		const nestedKeys = key.match(REGEX_NESTED_KEYS);
 
 		let parent = root;
 		for (var keyIdx = 0; keyIdx < nestedKeys.length; keyIdx++) {
@@ -49,8 +54,15 @@ const serialize = form => {
 
 			const isParentArray = Array.isArray(parent);
 			const isCurrentKeyIdx = isIdx(currentKey);
-			if ((isParentArray && !isCurrentKeyIdx) || (!isParentArray && isCurrentKeyIdx)) {
-				throw new TypeError(`Parent is ${isParentArray ? 'Array' : 'Object'}, but key is ${isCurrentKeyIdx ? 'index' : 'not index'}. - key=${key}`);
+			if (
+				(isParentArray && !isCurrentKeyIdx) ||
+				(!isParentArray && isCurrentKeyIdx)
+			) {
+				throw new TypeError(
+					`Parent is ${isParentArray ? "Array" : "Object"}, but key is ${
+						isCurrentKeyIdx ? "index" : "not index"
+					}. - key=${key}`
+				);
 			}
 
 			if (!nextKey) {
@@ -68,4 +80,19 @@ const serialize = form => {
 	return root;
 };
 
-export { serialize };
+const deserialize = (form, json) => {
+	form.querySelectorAll("[name]").forEach(el => {
+		const key = el.getAttribute("name");
+		if (REGEX_FULL_KEY.test(key) === false) {
+			throw new TypeError(`Invalid json key. name="${key}"`);
+		}
+		const value = key
+			.match(REGEX_NESTED_KEYS)
+			.reduce((parent, key) => parent[key], json);
+
+		// TODO :: each type..
+		el.value = value;
+	});
+};
+
+export { serialize, deserialize };
